@@ -1,0 +1,17 @@
+node_modules
+artifacts
+lib
+scripts
+attached_assets
+.local
+__pycache__
+*.pyc
+*.pyo
+pnpm-lock.yaml
+package.json
+pnpm-workspace.yaml
+tsconfig*.json
+replit.md
+combo_*.txt
+proxy_*.txt
+hits.txt
